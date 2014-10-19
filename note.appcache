@@ -1,0 +1,8 @@
+CACHE MANIFEST
+# vs
+../libs/bootstrap/css/bootstrap.min.css
+../libs/jquery.min.js
+../libs/bootstrap/js/bootstrap.min.js
+../libs/angular.min.js
+../libs/jquery.autosize.js
+image/search.png

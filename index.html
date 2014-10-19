@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh" manifest="note.appcache">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>便签</title>
+<link href="libs/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+<link href="image/fav.ico" rel="shortcut icon">
+<style>
+.tip{
+width:100%;
+overflow:hidden;
+font-size: 17px;
+font-family: "Microsoft YaHei" ! important;
+resize: none;
+border:0px;
+border-color: #fff;
+margin: 14px 0px 0px 0px;
+padding: 0px;
+}
+input,textarea:focus {
+ outline:0;
+ outline:none;
+}
+
+.header{
+margin-top: 20px;
+margin-bottom: 20px;
+font-size: 17px;
+}
+
+.tipsContainer{
+  margin: 15px 0px 0px 0px;
+}
+
+.imageButton {
+  margin: -2px 6px 0px 6px;
+  width: 36px;
+  height: 36px;
+}
+
+.plainMode{
+width:100%;
+height: 600px;
+font-size: 20px;
+resize: none;
+margin-top: 5px;
+}
+
+.searchHistory {
+margin-top: 12px;
+margin-left: 1px;
+}
+
+.split {
+  border: 1;
+  color: #987cb9;
+  margin:0px;
+}
+
+.tiprow{
+  position:relative;
+}
+
+.imageInputWrapper {
+  width: 100%;
+  border:solid 1px #000;
+}
+.inputWithImage {
+  padding-top: 3px;
+  border:none;
+  width: 80%;
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <h1 contenteditable="true" class="text-center text-primary">叮当便签</h1>
+    <div class="row clearfix">
+        <div class="col-md-2 column"></div>
+        <div class="col-md-8 column header" ng-app="ngTipsApp"
+          ng-controller="ngTipsController">
+            <div class="row clearfix">
+              <div class="col-xs-6 column">
+                <div class="imageInputWrapper">
+                  <img src="image/search.png" style="border-right:solid 1px #000" />
+                  <input ng-model="contentFilter"
+                    id="find"
+                    class="inputWithImage"
+                    type="text"
+                    placeholder="Ctrl + F">
+                </div>
+              </div>
+              <div class="col-xs-6 column">
+                <div class="btn-group">
+                  <button id="createBtn" class="btn btn-default " ng-click="createTip($event)" type="button">新增</button>
+                  <button class="btn btn-default " type="button" ng-click="importExport()" >导入/导出</button>
+                  <button class="btn btn-default "
+                    onclick="javascript:openWin('.','新窗口',800,600,20,20,'no','no','no','no','no','no');"
+                    type="button" >小窗</button>
+                  <a class="btn btn-default " type="button" href="help.html" target="_blank" >帮助</a>
+                </div>
+              </div>
+            </div>
+           <div class="view">
+              <ul class="list-inline searchHistory">
+                <li ng-repeat="h in searchHistorys">
+                  <a href="#" ng-click="quickSearch(h.content)" class="btn btn-link" type="button">{{h.content}}</a>
+                </li>
+              </ul>
+          </div>
+            <div class="row clearfix tipsContainer" >
+              <hr class="split"/>
+              <div ng-hide="plainMode" ng-repeat="t in tips | filter: tipFilter" class="tiprow">
+               <textarea
+                ng-model="t.content"
+                autosize
+                spellcheck="false"
+                id="{{t.id}}"
+                ng-Focus="t.highLight = true;"
+                ng-Blur="t.highLight = false;"
+                ng-change="onTipChange(t)"
+                class="tip"
+                placeholder="{{placeholder}}">{{t.content}}</textarea>
+                <div style="position:absolute; bottom:9px; right:2px;" ng-show="t.highLight">
+                  <div class="btn-group">
+                  <button class="btn btn-default" type="button" ng-click="delTip(t);">删除</button>
+                  <button class="btn btn-default" type="button" ng-click="selectTip(t)">全选</button>
+                  </div>
+                </div>
+                <hr class="split"/>
+              </div>
+              <div ng-show="plainMode">
+                <div class="alert alert-info" role="alert" ng-hide="importAlertHide">
+                  导出导入,每个tip之间用空行隔开.
+                <button type="button" class="close" data-dismiss="alert" ng-click="hideImportAlert()">
+                  <span aria-hidden="true">&times;</span>
+                  <span class="sr-only">Close</span>
+                </div>
+                <textarea class="plainMode" ng-model="plainTips" ></textarea>
+              </div>
+            </div>
+        </div>
+        <div class="col-md-2 column"></div>
+    </div>
+
+</div>
+<!-- /container -->
+<script src="libs/jquery.min.js"></script>
+<script src="libs/jquery.autosize.js"></script>
+<script src="libs/bootstrap/js/bootstrap.min.js"></script>
+<script src="libs/angular.min.js"></script>
+<script type="text/javascript">
+
+window.addEventListener("keydown",function (e) {
+    if (e.keyCode === 114 || (e.ctrlKey && e.keyCode === 70)) {
+      e.preventDefault();
+      $('#find').focus().select();
+    } else if (e.ctrlKey && e.keyCode === 83) {
+      e.preventDefault();
+      $('#createBtn').click();
+    }
+})
+
+function randomUUID() {
+  var s = [], itoh = '0123456789ABCDEF';
+
+  // Make array of random hex digits. The UUID only has 32 digits in it, but we
+  // allocate an extra items to make room for the '-'s we'll be inserting.
+  for (var i = 0; i < 36; i++) s[i] = Math.floor(Math.random()*0x10);
+
+  // Conform to RFC-4122, section 4.4
+  s[14] = 4;  // Set 4 high bits of time_high field to version
+  s[19] = (s[19] & 0x3) | 0x8;  // Specify 2 high bits of clock sequence
+
+  // Convert to hex chars
+  for (var i = 0; i < 36; i++) s[i] = itoh[s[i]];
+
+  // Insert '-'s
+  s[8] = s[13] = s[18] = s[23] = '-';
+
+  return s.join('');
+}
+
+function createOneTip (body) {
+  var t = {content:body || '', id:randomUUID(), borderColor:'', time:new Date().getTime()};
+  return t;
+}
+
+function loadTips () {
+  var ts = [];
+  for (var i in localStorage) {
+     if (i.match(/msg_[\dABCDEFabcdef-]+/)) {
+        ts.push(JSON.parse(localStorage[i]));
+     }
+  }
+  ts.sort(function (ta, tb) {
+    return tb.time - ta.time;
+  })
+
+  if (ts.length == 0) {
+    ts.push(createOneTip());
+  }
+  return ts;
+}
+
+function saveTip (tip) {
+  localStorage['msg_' + tip.id] = JSON.stringify({id:tip.id, content:tip.content, time:tip.time});
+  //console.log(localStorage['msg_' + tip.id]);
+}
+
+function deleteTip (tip) {
+  delete localStorage['msg_' + tip.id];
+}
+
+var ngTipsapp = angular.module("ngTipsApp", []);
+
+ngTipsapp.directive('ng-Focus', function() {
+  return function(scope, element, attr) {
+    element.bind('focus', function(event) {
+      scope.$apply(attr.ngFocus);
+    });
+  }
+});
+
+ngTipsapp.directive('ng-Blur', function($parse) {
+  return function(scope, element, attr) {
+    element.bind('blur', function(event) {
+      scope.$apply(attr.ngBlur);
+    });
+  }
+});
+
+ngTipsapp.directive('autosize', function() {
+    return {
+      restrict : 'A',
+      link : function (scope, elem, attr) {
+        elem.ready(function () {
+          if (scope.$first === true) {
+            setTimeout(
+              function() {
+                if(!elem.val()) {
+                  if (Document.activeElement && Document.activeElement.id !== 'find') {
+                    return;
+                  }
+                  elem.focus();
+                }
+              });
+          }
+          $(elem).autosize().trigger('autosize.resize');
+        });
+      }
+    };
+});
+
+ngTipsapp.controller("ngTipsController", function ($scope) {
+  $scope.placeholder = "记录一些事情...";
+  $scope.plainMode = false;
+  $scope.searchHistorys = localStorage.searchHistorys && JSON.parse(localStorage.searchHistorys) || [];
+
+
+  $scope.quickSearch = function (t) {
+    $scope.contentFilter = t;
+  }
+
+  $scope.tipFilter = function (t) {
+    if ($scope.contentFilter) {
+      return t && t.content && t.content.indexOf($scope.contentFilter) != -1;
+    }
+    return true;
+  };
+
+  $scope.createTip = function (argument) {
+    $scope.contentFilter = undefined;
+    if ($scope.plainMode) {
+      $scope.importExport();
+    }
+    if ($scope.tips.length > 0 && !$scope.tips[0].content) {
+      $('#'+$scope.tips[0].id).focus();
+      return;
+    }
+    var t = createOneTip()
+    $scope.tips.splice(0, 0, t);
+  };
+
+  $scope.tips = loadTips();
+  $scope.onTipChange = function (tip) {
+    saveTip(tip);
+  };
+
+  $scope.delTip = function (tip) {
+    var idx = $scope.tips.indexOf(tip);
+    if (idx != -1) {
+      $scope.tips.splice(idx, 1);
+      deleteTip(tip);
+    }
+  };
+
+  $scope.selectTip = function (tip) {
+    $('#' + tip.id).select();
+    var sh = $('#find').val();
+    if (sh) {
+      var sl = $scope.searchHistorys.filter(function (h) {
+        return sh === h.content;
+      });
+
+      if (sl.length > 0) {
+        sl[0].time = new Date().getTime();
+        $scope.searchHistorys.sort(function (sa, sb) {
+            return sb.time - sa.time;
+        });
+      } else {
+        $scope.searchHistorys.splice(0, 0, {content:sh, time:new Date().getTime()});
+      }
+      if ($scope.searchHistorys.length > 6) {
+        $scope.searchHistorys.splice(6, 1);
+      }
+      $scope.saveSearchHistorys();
+    }
+  };
+
+  $scope.saveSearchHistorys = function () {
+    localStorage.searchHistorys = JSON.stringify($scope.searchHistorys);
+  }
+
+  $scope.importExport = function () {
+    if (!$scope.plainMode) {
+      $scope.plainMode = true;
+      $scope.plainTips = $scope.tips.reduce(function (pre, t) {
+        if (!t.content) return "";
+        return pre + t.content + "\n\n";
+      }, "");
+    } else {
+      $scope.plainMode = false;
+      var newtips = $scope.plainTips.split('\n\n').filter(function (tc) { return tc;});
+      if (newtips.length == 0) newtips[0] = '';
+      $scope.plainTips = '';
+      for (var i = $scope.tips.length - 1; i >= 0; i--) {
+        deleteTip($scope.tips[i]);
+      };
+      $scope.tips = []
+      for (var i = newtips.length - 1; i >= 0; i--) {
+        var t = createOneTip(newtips[i]);
+        t.time += i*30;
+        saveTip(t);
+        newtips[i] = t;
+      }
+      $scope.tips = newtips;
+      setTimeout( function () {
+        $('textarea').each(function (t) {$(this).trigger('autosize.resize');})
+      },100);
+    }
+  };
+  $scope.importAlertHide = localStorage.importAlertHide;
+  $scope.hideImportAlert = function () {
+    $scope.importAlertHide = localStorage.importAlertHide = true;
+  }
+
+});
+
+ /**
+   * 打开窗口
+   * IE和Firefox都支持
+   * @param {Object} url ：窗口的文件名
+   * @param {Object} title ：窗口标题
+   * @param {Object} H ：窗口高度
+   * @param {Object} W ：窗口宽度
+   * @param {Object} T ：窗口距离屏幕上方的象素值
+   * @param {Object} L ：窗口距离屏幕左侧的象素值
+   * @param {Object} Tool ：是否显示工具栏，yes为显示
+   * @param {Object} Menu ：是否显示菜单栏
+   * @param {Object} Scroll ：是否允许改变窗口大小，yes为允许
+   * @param {Object} Resize ：是否允许改变窗口大小，yes为允许
+   * @param {Object} Locate ：是否显示地址栏，yes为允许
+   * @param {Object} Status ：是否显示状态栏内的信息
+   */
+  function openWin(url,title,H,W,T,L,Tool,Menu,Scroll,Resize,Locate,Status){
+      var  qualify="width="+W+",height="+H+",left="+L+",top="+T+",toolbar="+Tool+",menubar="+Menu+",scrollbars="+Scroll+",resizable="+Resize+",location="+Locate+",status="+Status;
+      var openwin=window.open(url,title,qualify);
+      if (!openwin.opener){
+          openwin.opener = self;
+      }
+      openwin.focus();
+  }
+</script>
+</body>
+</html>
